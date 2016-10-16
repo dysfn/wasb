@@ -1,0 +1,4 @@
+{
+  "apitoken": "api_token_for_your_bot",
+  "workers": 3
+}
