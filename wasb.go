@@ -90,7 +90,7 @@ func startRTM(token string) (*RespRTMStart, error) {
 	return &result, nil
 }
 
-func startWorker(wg *sync.WaitGroup, done <-chan bool, msgs <-chan Message) {
+func startWorker(wg *sync.WaitGroup, done <-chan bool, msgs <-chan string) {
 	wg.Add(1)
 	defer wg.Done()
 	for {
@@ -98,7 +98,7 @@ func startWorker(wg *sync.WaitGroup, done <-chan bool, msgs <-chan Message) {
 		case <-done:
 			return
 		case m := <-msgs:
-			log.Printf("Received: %s", m.Text)
+			log.Printf("Received: %s", m)
 			time.Sleep(10 * time.Second)
 		}
 	}
@@ -139,12 +139,11 @@ func main() {
 	defer close(sigs)
 
 	// Channel for receiving messages
-	msgs := make(chan Message)
+	msgs := make(chan string)
 	defer close(msgs)
 
 	// Channel for broadcasting "done" signals
-	done := make(chan bool, config.Workers)
-	defer close(done)
+	done := make(chan bool)
 
 	log.Printf("Receiving messages...")
 	go func() {
@@ -153,9 +152,10 @@ func main() {
 			err = websocket.JSON.Receive(wsConn, &m)
 			if err != nil {
 				log.Printf("Error receiving message: %+v", err)
+				continue
 			}
-			if m.Type == "message" {
-				msgs <- m
+			if m.Type == "message" && m.Text != "" {
+				msgs <- m.Text
 			}
 		}
 	}()
@@ -167,16 +167,14 @@ func main() {
 		go startWorker(&wg, done, msgs)
 	}
 
-	// Wait for workers to complete then terminate
-	for s := range sigs {
-		log.Printf("Signal (%s) received. Waiting for workers to complete...", s)
+	// Receive OS error signal
+	s := <-sigs
+	log.Printf("Signal (%s) received. Waiting for workers to complete...", s)
 
-		// Broadcost done signals to all worker goroutines
-		for i := 0; i < config.Workers; i++ {
-			done <- true
-		}
+	// Close channel to broadcast done signals to all worker goroutines
+	close(done)
 
-		wg.Wait()
-		log.Fatalf("Aborting...")
-	}
+	// Wait for goroutines to complete then terminate
+	wg.Wait()
+	log.Fatalf("Aborting...")
 }
