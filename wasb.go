@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"golang.org/x/net/websocket"
 )
@@ -22,8 +21,8 @@ const (
 	slackURLOrigin   = "https://api.slack.com/"
 )
 
-// Config ...
-type Config struct {
+// Cfg ...
+type Cfg struct {
 	APIToken string `json:"apitoken"`
 	Workers  int    `json:"workers"`
 }
@@ -41,15 +40,35 @@ type RespRTMStartSelf struct {
 	ID string `json:"id"`
 }
 
-// Message ...
-type Message struct {
+// Msg ...
+type Msg struct {
 	ID      uint64 `json:"id"`
 	Type    string `json:"type"`
 	Channel string `json:"channel"`
 	Text    string `json:"text"`
 }
 
-func startRTM(token string) (*RespRTMStart, error) {
+// WASB ...
+type WASB interface {
+	ReceiveMessage() (*Msg, error)
+	FilterMessage(m *Msg) bool
+	SendMessage(m *Msg) error
+}
+
+func GetCfg(filename string) (*Cfg, error) {
+	f, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Cfg
+	err = json.Unmarshal(f, &cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func StartRTM(token string) (*RespRTMStart, error) {
 	u, err := url.Parse(slackURLRTMStart)
 	if err != nil {
 		return nil, err
@@ -90,81 +109,64 @@ func startRTM(token string) (*RespRTMStart, error) {
 	return &result, nil
 }
 
-func startWorker(wg *sync.WaitGroup, done <-chan bool, msgs <-chan string) {
-	wg.Add(1)
-	defer wg.Done()
-	for {
-		select {
-		case <-done:
-			return
-		case m := <-msgs:
-			log.Printf("Received: %s", m)
-			time.Sleep(10 * time.Second)
-		}
-	}
+func GetWSConn(url string) (*websocket.Conn, error) {
+	conn, err := websocket.Dial(url, "", slackURLOrigin)
+	return conn, err
 }
 
-func main() {
-	f, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	var config Config
-	err = json.Unmarshal(f, &config)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.Printf("Starting RTM...")
-	respRTMStart, err := startRTM(config.APIToken)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("RTM started")
-
-	log.Printf("Establishing Websocket connection...")
-	wsConn, err := websocket.Dial(respRTMStart.URL, "", slackURLOrigin)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("Websocket connection established")
-	defer func() {
-		err = wsConn.Close()
-		log.Printf("Error closing Websocket connection: %+v", err)
-	}()
-
+// Start ...
+func Start(wasb WASB, workers int) {
 	// Channel for receiving OS error signals
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	defer close(sigs)
 
 	// Channel for receiving messages
-	msgs := make(chan string)
+	msgs := make(chan *Msg)
 	defer close(msgs)
 
 	// Channel for broadcasting "done" signals
 	done := make(chan bool)
 
+	// Publish messages
 	log.Printf("Receiving messages...")
 	go func() {
 		for {
-			var m Message
-			err = websocket.JSON.Receive(wsConn, &m)
+			m, err := wasb.ReceiveMessage()
 			if err != nil {
 				log.Printf("Error receiving message: %+v", err)
 				continue
 			}
-			if m.Type == "message" && m.Text != "" {
-				msgs <- m.Text
+			if wasb.FilterMessage(m) {
+				msgs <- m
 			}
 		}
 	}()
 
+	// Wait group to keep track of worker cancellation
 	var wg sync.WaitGroup
 
+	// Subscribe messages
+	startWorker := func() {
+		wg.Add(1)
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			case m := <-msgs:
+				err := wasb.SendMessage(m)
+				if err != nil {
+					log.Printf("Error sending over Websocket: %+v", err)
+					continue
+				}
+			}
+		}
+	}
+
 	// Start concurrent workers
-	for i := 0; i < config.Workers; i++ {
-		go startWorker(&wg, done, msgs)
+	for i := 0; i < workers; i++ {
+		go startWorker()
 	}
 
 	// Receive OS error signal
