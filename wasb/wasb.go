@@ -1,10 +1,9 @@
-package main
+package wasb
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,7 +15,6 @@ import (
 )
 
 const (
-	configFile       = "config.json"
 	slackURLRTMStart = "https://slack.com/api/rtm.start?token=XXX"
 	slackURLOrigin   = "https://api.slack.com/"
 )
@@ -87,10 +85,7 @@ func StartRTM(token string) (*RespRTMStart, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		err = resp.Body.Close()
-		log.Printf("Error closing response body: %+v", err)
-	}()
+	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -100,7 +95,7 @@ func StartRTM(token string) (*RespRTMStart, error) {
 	var result RespRTMStart
 	err = json.Unmarshal(body, &result)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 	if !result.OK {
 		return nil, fmt.Errorf(result.Error)
@@ -129,12 +124,10 @@ func Start(wasb WASB, workers int) {
 	done := make(chan bool)
 
 	// Publish messages
-	log.Printf("Receiving messages...")
 	go func() {
 		for {
 			m, err := wasb.ReceiveMessage()
 			if err != nil {
-				log.Printf("Error receiving message: %+v", err)
 				continue
 			}
 			if wasb.FilterMessage(m) {
@@ -157,7 +150,6 @@ func Start(wasb WASB, workers int) {
 			case m := <-msgs:
 				err := wasb.SendMessage(m)
 				if err != nil {
-					log.Printf("Error sending over Websocket: %+v", err)
 					continue
 				}
 			}
@@ -170,13 +162,11 @@ func Start(wasb WASB, workers int) {
 	}
 
 	// Receive OS error signal
-	s := <-sigs
-	log.Printf("Signal (%s) received. Waiting for workers to complete...", s)
+	<-sigs
 
 	// Close channel to broadcast done signals to all worker goroutines
 	close(done)
 
 	// Wait for goroutines to complete then terminate
 	wg.Wait()
-	log.Fatalf("Aborting...")
 }

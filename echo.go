@@ -3,8 +3,12 @@ package main
 import (
 	"log"
 
+	"github.com/microamp/wasb/wasb"
+
 	"golang.org/x/net/websocket"
 )
+
+const configFile = "config.json"
 
 // Echo ...
 type Echo struct {
@@ -12,8 +16,8 @@ type Echo struct {
 }
 
 // ReceiveMessage ...
-func (bot *Echo) ReceiveMessage() (*Msg, error) {
-	var m Msg
+func (bot *Echo) ReceiveMessage() (*wasb.Msg, error) {
+	var m wasb.Msg
 	err := websocket.JSON.Receive(bot.conn, &m)
 	if err != nil {
 		return nil, err
@@ -22,33 +26,33 @@ func (bot *Echo) ReceiveMessage() (*Msg, error) {
 }
 
 // FilterMessage ...
-func (bot *Echo) FilterMessage(m *Msg) bool {
+func (bot *Echo) FilterMessage(m *wasb.Msg) bool {
 	return m.Type == "message" && m.Text != ""
 }
 
 // SendMessage ...
-func (bot *Echo) SendMessage(m *Msg) error {
+func (bot *Echo) SendMessage(m *wasb.Msg) error {
 	err := websocket.JSON.Send(bot.conn, m)
 	return err
 }
 
 func main() {
 	log.Printf("Loading config...")
-	cfg, err := GetCfg(configFile)
+	cfg, err := wasb.GetCfg(configFile)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Printf("Config loaded")
 
 	log.Printf("Starting RTM...")
-	respRTMStart, err := StartRTM(cfg.APIToken)
+	respRTMStart, err := wasb.StartRTM(cfg.APIToken)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Printf("RTM started")
 
 	log.Printf("Establishing Websocket connection...")
-	conn, err := GetWSConn(respRTMStart.URL)
+	conn, err := wasb.GetWSConn(respRTMStart.URL)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -58,6 +62,7 @@ func main() {
 		log.Printf("Error closing Websocket connection: %+v", err)
 	}()
 
+	log.Printf("Launching the bot...")
 	echoBot := &Echo{conn: conn}
-	Start(echoBot, cfg.Workers)
+	wasb.Start(echoBot, cfg.Workers)
 }
