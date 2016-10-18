@@ -10,12 +10,10 @@ import (
 
 const configFile = "config.json"
 
-// Echo ...
 type Echo struct {
 	conn *websocket.Conn
 }
 
-// ReceiveMessage ...
 func (bot *Echo) ReceiveMessage() (*wasb.Msg, error) {
 	var m wasb.Msg
 	err := websocket.JSON.Receive(bot.conn, &m)
@@ -25,12 +23,10 @@ func (bot *Echo) ReceiveMessage() (*wasb.Msg, error) {
 	return &m, nil
 }
 
-// FilterMessage ...
-func (bot *Echo) FilterMessage(m *wasb.Msg) bool {
+func (bot *Echo) IsValidMessage(m *wasb.Msg) bool {
 	return m.Type == "message" && m.Text != ""
 }
 
-// SendMessage ...
 func (bot *Echo) SendMessage(m *wasb.Msg) error {
 	err := websocket.JSON.Send(bot.conn, m)
 	return err

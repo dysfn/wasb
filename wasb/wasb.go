@@ -19,13 +19,11 @@ const (
 	slackURLOrigin   = "https://api.slack.com/"
 )
 
-// Cfg ...
 type Cfg struct {
 	APIToken string `json:"apitoken"`
 	Workers  int    `json:"workers"`
 }
 
-// RespRTMStart ...
 type RespRTMStart struct {
 	OK    bool              `json:"ok"`
 	Error string            `json:"error"`
@@ -33,12 +31,10 @@ type RespRTMStart struct {
 	Self  *RespRTMStartSelf `json:"self"`
 }
 
-// RespRTMStartSelf ...
 type RespRTMStartSelf struct {
 	ID string `json:"id"`
 }
 
-// Msg ...
 type Msg struct {
 	ID      uint64 `json:"id"`
 	Type    string `json:"type"`
@@ -46,10 +42,9 @@ type Msg struct {
 	Text    string `json:"text"`
 }
 
-// WASB ...
 type WASB interface {
 	ReceiveMessage() (*Msg, error)
-	FilterMessage(m *Msg) bool
+	IsValidMessage(m *Msg) bool
 	SendMessage(m *Msg) error
 }
 
@@ -109,7 +104,6 @@ func GetWSConn(url string) (*websocket.Conn, error) {
 	return conn, err
 }
 
-// Start ...
 func Start(wasb WASB, workers int) {
 	// Channel for receiving OS error signals
 	sigs := make(chan os.Signal)
@@ -130,7 +124,7 @@ func Start(wasb WASB, workers int) {
 			if err != nil {
 				continue
 			}
-			if wasb.FilterMessage(m) {
+			if wasb.IsValidMessage(m) {
 				msgs <- m
 			}
 		}
