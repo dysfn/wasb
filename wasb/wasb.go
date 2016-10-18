@@ -105,6 +105,9 @@ func GetWSConn(url string) (*websocket.Conn, error) {
 }
 
 func Start(wasb WASB, workers int) {
+	// Wait group to keep track of worker cancellation
+	var wg sync.WaitGroup
+
 	// Channel for receiving OS error signals
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
@@ -112,30 +115,33 @@ func Start(wasb WASB, workers int) {
 
 	// Channel for receiving messages
 	msgs := make(chan *Msg)
-	defer close(msgs)
 
 	// Channel for broadcasting "done" signals
 	done := make(chan bool)
 
 	// Publish messages
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		defer close(msgs)
 		for {
-			m, err := wasb.ReceiveMessage()
-			if err != nil {
-				continue
-			}
-			if wasb.IsValidMessage(m) {
-				msgs <- m
+			select {
+			case <-done:
+				return
+			default:
+				m, err := wasb.ReceiveMessage()
+				if err != nil {
+					continue
+				}
+				if wasb.IsValidMessage(m) {
+					msgs <- m
+				}
 			}
 		}
 	}()
 
-	// Wait group to keep track of worker cancellation
-	var wg sync.WaitGroup
-
 	// Subscribe messages
 	startWorker := func() {
-		wg.Add(1)
 		defer wg.Done()
 		for {
 			select {
@@ -152,6 +158,7 @@ func Start(wasb WASB, workers int) {
 
 	// Start concurrent workers
 	for i := 0; i < workers; i++ {
+		wg.Add(1)
 		go startWorker()
 	}
 
