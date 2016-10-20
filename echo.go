@@ -1,14 +1,18 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"os"
 
 	"github.com/microamp/wasb/wasb"
 
 	"golang.org/x/net/websocket"
 )
 
-const configFile = "config.json"
+const defaultConfigFile = "config.json"
+
+var configFile string
 
 type Echo struct {
 	conn *websocket.Conn
@@ -33,7 +37,14 @@ func (bot *Echo) SendMessage(m *wasb.Msg) error {
 }
 
 func main() {
-	log.Printf("Loading config...")
+	flags := flag.NewFlagSet("echo", flag.ExitOnError)
+	flags.StringVar(&configFile, "config", defaultConfigFile, "")
+	err := flags.Parse(os.Args[1:])
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Printf("Loading config (filename: %s)...", configFile)
 	cfg, err := wasb.GetCfg(configFile)
 	if err != nil {
 		log.Fatalln(err)
