@@ -30,7 +30,7 @@ type WASB interface {
 }
 ```
 
-You can find a simple example in `cmd/echo/echo.go`.
+See how `Echo` implements the interface in [`cmd/echo/echo.go`](https://github.com/microamp/wasb/blob/master/cmd/echo/echo.go).
 
 ## License
 
