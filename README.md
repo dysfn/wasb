@@ -4,7 +4,7 @@ Write a Slack bot
 
 ## Quickstart
 
-First, create a new bot user, then prepare a new config file for the bot.
+First, create a new bot user on Slack. Then, prepare a new config file for the bot.
 
 ```bash
 cp config.json.template echo-config.json
