@@ -121,9 +121,7 @@ func Start(wasb WASB, workers int) {
 	done := make(chan bool)
 
 	// Publish messages
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer close(msgs)
 		for {
 			select {
