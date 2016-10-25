@@ -36,6 +36,12 @@ func (bot *Echo) SendMessage(m *wasb.Msg) error {
 	return err
 }
 
+func (bot *Echo) TearDown() error {
+	log.Printf("Closing websocket connection...")
+	err := bot.conn.Close()
+	return err
+}
+
 func main() {
 	flags := flag.NewFlagSet("echo", flag.ExitOnError)
 	flags.StringVar(&configFile, "config", defaultConfigFile, "")
@@ -64,10 +70,6 @@ func main() {
 		log.Fatalln(err)
 	}
 	log.Printf("Websocket connection established")
-	defer func() {
-		err = conn.Close()
-		log.Printf("Error closing Websocket connection: %+v", err)
-	}()
 
 	log.Printf("Launching the bot...")
 	echoBot := &Echo{conn: conn}

@@ -46,6 +46,7 @@ type WASB interface {
 	ReceiveMessage() (*Msg, error)
 	IsValidMessage(m *Msg) bool
 	SendMessage(m *Msg) error
+	TearDown() error
 }
 
 func GetCfg(filename string) (*Cfg, error) {
@@ -170,4 +171,10 @@ func Start(wasb WASB, workers int) {
 
 	// Wait for goroutines to complete then terminate
 	wg.Wait()
+
+	// Tear down to complete the process
+	err := wasb.TearDown()
+	if err != nil {
+		panic(err)
+	}
 }
