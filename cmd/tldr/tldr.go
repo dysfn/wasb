@@ -20,7 +20,8 @@ var configFile string
 type TLDR struct {
 	conn          *websocket.Conn
 	summaryLength string
-	botID         string
+	prefixToTrim  string
+	suffixToTrim  string
 }
 
 func (bot *TLDR) ReceiveMessage() (*wasb.Msg, error) {
@@ -34,8 +35,8 @@ func (bot *TLDR) ReceiveMessage() (*wasb.Msg, error) {
 
 func (bot *TLDR) IsValidMessage(m *wasb.Msg) bool {
 	return m.Type == "message" &&
-		strings.HasPrefix(m.Text, fmt.Sprintf("<@%s> <", bot.botID)) &&
-		strings.HasSuffix(m.Text, ">")
+		strings.HasPrefix(m.Text, bot.prefixToTrim) &&
+		strings.HasSuffix(m.Text, bot.suffixToTrim)
 }
 
 func (bot *TLDR) SendMessage(m *wasb.Msg) error {
@@ -44,15 +45,14 @@ func (bot *TLDR) SendMessage(m *wasb.Msg) error {
 		return err
 	}
 
-	url := strings.TrimLeft(m.Text, fmt.Sprintf("<@%s> ", bot.botID))
-	url = strings.TrimRight(url, ">")
+	url := strings.TrimLeft(m.Text, bot.prefixToTrim)
+	url = strings.TrimRight(url, bot.suffixToTrim)
 	summary, err := client.SummaryByWebsite(url, bot.summaryLength)
 	if err != nil {
 		return err
 	}
 
 	resp := &wasb.Msg{
-		ID:      m.ID,
 		Type:    "message",
 		Channel: m.Channel,
 		Text:    summary.SmAPIContent,
@@ -99,7 +99,8 @@ func main() {
 	tldrBot := &TLDR{
 		conn:          conn,
 		summaryLength: "5",
-		botID:         respRTMStart.Self.ID,
+		prefixToTrim:  fmt.Sprintf("<@%s> <", respRTMStart.Self.ID),
+		suffixToTrim:  ">",
 	}
 	wasb.Start(tldrBot, cfg.Workers)
 }
