@@ -27,10 +27,11 @@ type WASB interface {
 	ReceiveMessage() (*Msg, error)
 	IsValidMessage(m *Msg) bool
 	SendMessage(m *Msg) error
+	TearDown() error
 }
 ```
 
-See how `Echo` implements the interface in [`cmd/echo/echo.go`](https://github.com/microamp/wasb/blob/master/cmd/echo/echo.go).
+As a simple example, see how `Echo` implements it in [`cmd/echo/echo.go`](https://github.com/microamp/wasb/blob/master/cmd/echo/echo.go).
 
 ## License
 
