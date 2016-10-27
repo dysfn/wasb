@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dysfn/wasb/wasb"
 	"github.com/microamp/go-smmry/smmry"
-	"github.com/microamp/wasb/wasb"
 
 	"golang.org/x/net/websocket"
 )
