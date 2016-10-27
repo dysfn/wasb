@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/microamp/wasb/wasb"
+	"github.com/dysfn/wasb/wasb"
 
 	"golang.org/x/net/websocket"
 )
