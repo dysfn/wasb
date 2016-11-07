@@ -1,5 +1,7 @@
 # wasb
 
+[![Build Status](https://travis-ci.org/dysfn/wasb.svg?branch=master)](https://travis-ci.org/dysfn/wasb)
+
 Write a Slack bot in Go
 
 ## Quickstart
